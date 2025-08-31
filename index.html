@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Focus Stopwatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .timer-display {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+
+    <main class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-cyan-400">Study Stopwatch</h1>
+            <p class="text-gray-400 mt-2">Focus on your work, one session at a time.</p>
+        </div>
+
+        <!-- Timer Display -->
+        <div class="bg-gray-900 rounded-xl p-6 mb-8 text-center">
+            <p id="timer" class="text-6xl md:text-7xl font-black text-white timer-display tracking-wider">00:00:00</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button id="startButton" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg focus:outline-none focus:ring-4 focus:ring-cyan-500/50">
+                Start
+            </button>
+            <button id="stopButton" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg focus:outline-none focus:ring-4 focus:ring-pink-500/50" disabled>
+                Stop
+            </button>
+        </div>
+
+        <!-- Study Log Section -->
+        <div class="space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-semibold text-gray-300">Study Log</h2>
+                <button id="resetButton" class="text-sm text-gray-500 hover:text-white transition-colors">Clear Log</button>
+            </div>
+            
+            <div id="logContainer" class="bg-gray-900/50 rounded-lg p-4 h-40 overflow-y-auto">
+                <ul id="logList" class="space-y-2 text-gray-300">
+                    <!-- Log entries will be added here -->
+                    <li class="text-center text-gray-500 italic">Your study sessions will appear here.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Total Time Section -->
+        <div class="mt-6 border-t border-gray-700 pt-4 text-center">
+            <p class="text-gray-400">Total Time Studied</p>
+            <p id="totalTime" class="text-2xl font-bold text-cyan-400 mt-1">00:00:00</p>
+        </div>
+    </main>
+
+    <script>
+        // DOM Elements
+        const timerDisplay = document.getElementById('timer');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const resetButton = document.getElementById('resetButton');
+        const logList = document.getElementById('logList');
+        const totalTimeDisplay = document.getElementById('totalTime');
+
+        // State variables
+        let startTime = 0;
+        let intervalId = null;
+        let isRunning = false;
+        let studySessions = []; // Array to store session durations in seconds
+
+        // Event Listeners
+        startButton.addEventListener('click', startTimer);
+        stopButton.addEventListener('click', stopTimer);
+        resetButton.addEventListener('click', resetLog);
+
+        // --- Core Functions ---
+
+        function startTimer() {
+            if (isRunning) return; // Prevent multiple intervals
+            
+            isRunning = true;
+            startTime = Date.now();
+            
+            // Update the display every 100ms for smoother counting, though text updates are still per second
+            intervalId = setInterval(updateDisplay, 100);
+
+            // Update button states
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = false;
+            stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function stopTimer() {
+            if (!isRunning) return;
+
+            isRunning = false;
+            clearInterval(intervalId);
+
+            const elapsedTimeInSeconds = Math.round((Date.now() - startTime) / 1000);
+            if (elapsedTimeInSeconds > 0) {
+                studySessions.push(elapsedTimeInSeconds);
+                updateLog();
+                updateTotalTime();
+            }
+
+            // Reset timer display
+            timerDisplay.textContent = '00:00:00';
+
+            // Update button states
+            startButton.disabled = false;
+            startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = true;
+            stopButton.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        function resetLog() {
+             if (isRunning) return; // Don't reset while timer is active
+             
+             studySessions = [];
+             updateLog();
+             updateTotalTime();
+        }
+
+        // --- Helper & UI Functions ---
+
+        function updateDisplay() {
+            const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+            timerDisplay.textContent = formatTime(elapsedTime);
+        }
+
+        function updateLog() {
+            logList.innerHTML = ''; // Clear existing list
+
+            if (studySessions.length === 0) {
+                 logList.innerHTML = '<li class="text-center text-gray-500 italic">Your study sessions will appear here.</li>';
+                 return;
+            }
+
+            studySessions.forEach((session, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center bg-gray-700/50 p-2 rounded-md';
+                li.innerHTML = `
+                    <span>Session ${index + 1}</span>
+                    <span class="font-semibold">${formatTime(session)}</span>
+                `;
+                logList.appendChild(li);
+            });
+            // Auto-scroll to the bottom of the log
+            logList.parentElement.scrollTop = logList.parentElement.scrollHeight;
+        }
+
+        function updateTotalTime() {
+            const totalSeconds = studySessions.reduce((total, session) => total + session, 0);
+            totalTimeDisplay.textContent = formatTime(totalSeconds);
+        }
+
+        function formatTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            const paddedHours = String(hours).padStart(2, '0');
+            const paddedMinutes = String(minutes).padStart(2, '0');
+            const paddedSeconds = String(seconds).padStart(2, '0');
+
+            return `${paddedHours}:${paddedMinutes}:${paddedSeconds}`;
+        }
+        
+        // Initialize button states on page load
+        stopButton.classList.add('opacity-50', 'cursor-not-allowed');
+    </script>
+</body>
+</html>
+ 
