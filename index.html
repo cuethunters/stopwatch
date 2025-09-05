@@ -52,7 +52,7 @@
         </div>
 
         <div class="grid grid-cols-2 gap-4 mb-8">
-            <button id="startButton" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg focus:outline-none focus:ring-4 focus:ring-cyan-500/50">
+            <button id="startPauseButton" class="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg focus:outline-none focus:ring-4 focus:ring-cyan-500/50">
                 Start
             </button>
             <button id="stopButton" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-200 shadow-lg focus:outline-none focus:ring-4 focus:ring-pink-500/50" disabled>
@@ -97,7 +97,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             // DOM Elements
             const timerDisplay = document.getElementById('timer');
-            const startButton = document.getElementById('startButton');
+            const startPauseButton = document.getElementById('startPauseButton');
             const stopButton = document.getElementById('stopButton');
             const resetButton = document.getElementById('resetButton');
             const logList = document.getElementById('logList');
@@ -116,6 +116,8 @@
             let startTime = 0;
             let intervalId = null;
             let isRunning = false;
+            let isPaused = false;
+            let elapsedSeconds = 0;
             let currentSubject = '';
             let studySessions = JSON.parse(localStorage.getItem('studySessions')) || [];
 
@@ -125,7 +127,7 @@
                 renderView('today');
                 stopButton.classList.add('opacity-50', 'cursor-not-allowed');
                 
-                startButton.addEventListener('click', startTimer);
+                startPauseButton.addEventListener('click', handleStartPauseResume);
                 stopButton.addEventListener('click', stopTimer);
                 
                 resetButton.addEventListener('click', () => {
@@ -153,10 +155,18 @@
                 });
             }
 
-            // --- Core Timer Functions ---
+            // --- Main Timer Control ---
+            function handleStartPauseResume() {
+                if (isRunning) {
+                    pauseTimer();
+                } else if (isPaused) {
+                    resumeTimer();
+                } else {
+                    startTimer();
+                }
+            }
+
             function startTimer() {
-                if (isRunning) return;
-                
                 const subject = subjectInput.value.trim();
                 if (!subject) {
                     subjectError.textContent = 'Please enter a subject.';
@@ -164,28 +174,63 @@
                 }
                 subjectError.textContent = '';
                 currentSubject = subject;
-                
+
                 isRunning = true;
+                isPaused = false;
+                elapsedSeconds = 0;
                 startTime = Date.now();
                 intervalId = setInterval(updateDisplay, 100);
 
-                startButton.disabled = true;
-                startButton.classList.add('opacity-50', 'cursor-not-allowed');
+                // UI Updates
+                startPauseButton.textContent = 'Pause';
+                startPauseButton.classList.remove('bg-cyan-500', 'hover:bg-cyan-600', 'focus:ring-cyan-500/50');
+                startPauseButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600', 'focus:ring-yellow-500/50');
+                
                 stopButton.disabled = false;
                 stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 subjectInput.disabled = true;
             }
 
-            function stopTimer() {
-                if (!isRunning) return;
-
+            function pauseTimer() {
                 isRunning = false;
+                isPaused = true;
                 clearInterval(intervalId);
+                elapsedSeconds += (Date.now() - startTime) / 1000;
 
-                const elapsedTimeInSeconds = Math.round((Date.now() - startTime) / 1000);
-                if (elapsedTimeInSeconds > 0) {
+                // UI Updates
+                startPauseButton.textContent = 'Resume';
+                startPauseButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600', 'focus:ring-yellow-500/50');
+                startPauseButton.classList.add('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-500/50');
+            }
+
+            function resumeTimer() {
+                isRunning = true;
+                isPaused = false;
+                startTime = Date.now();
+                intervalId = setInterval(updateDisplay, 100);
+                
+                // UI Updates
+                startPauseButton.textContent = 'Pause';
+                startPauseButton.classList.remove('bg-green-500', 'hover:bg-green-600', 'focus:ring-green-500/50');
+                startPauseButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600', 'focus:ring-yellow-500/50');
+            }
+
+            function stopTimer() {
+                if (!isRunning && !isPaused) return;
+
+                clearInterval(intervalId);
+                
+                let finalElapsedTime;
+                if (isRunning) {
+                    finalElapsedTime = elapsedSeconds + (Date.now() - startTime) / 1000;
+                } else {
+                    finalElapsedTime = elapsedSeconds;
+                }
+                finalElapsedTime = Math.round(finalElapsedTime);
+
+                if (finalElapsedTime > 0) {
                     studySessions.push({
-                        duration: elapsedTimeInSeconds,
+                        duration: finalElapsedTime,
                         subject: currentSubject,
                         date: new Date().toISOString()
                     });
@@ -194,11 +239,16 @@
                     renderView(getActiveTab());
                 }
 
+                isRunning = false;
+                isPaused = false;
+                elapsedSeconds = 0;
                 timerDisplay.textContent = '00:00:00';
                 subjectInput.value = '';
                 
-                startButton.disabled = false;
-                startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                startPauseButton.textContent = 'Start';
+                startPauseButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600', 'focus:ring-yellow-500/50', 'bg-green-500', 'hover:bg-green-600', 'focus:ring-green-500/50');
+                startPauseButton.classList.add('bg-cyan-500', 'hover:bg-cyan-600', 'focus:ring-cyan-500/50');
+                
                 stopButton.disabled = true;
                 stopButton.classList.add('opacity-50', 'cursor-not-allowed');
                 subjectInput.disabled = false;
@@ -206,7 +256,7 @@
             
             // --- Data Deletion Functions ---
             function deleteSession(sessionId) {
-                if (isRunning) return;
+                if (isRunning || isPaused) return;
                 studySessions = studySessions.filter(session => session.date !== sessionId);
                 saveData();
                 updateTotalTime();
@@ -214,7 +264,7 @@
             }
             
             function resetTodaysLog() {
-                if (isRunning) return;
+                if (isRunning || isPaused) return;
                 const today = new Date().toISOString().slice(0, 10);
                 studySessions = studySessions.filter(s => s.date.slice(0, 10) !== today);
                 saveData();
@@ -223,7 +273,7 @@
             }
 
             function resetAllData() {
-                if (isRunning) return;
+                if (isRunning || isPaused) return;
                 studySessions = [];
                 saveData();
                 updateTotalTime();
@@ -252,8 +302,13 @@
 
             // --- UI Rendering ---
             function updateDisplay() {
-                const elapsedTime = Math.round((Date.now() - startTime) / 1000);
-                timerDisplay.textContent = formatTime(elapsedTime);
+                let currentTotalSeconds;
+                if (isRunning) {
+                    currentTotalSeconds = elapsedSeconds + (Date.now() - startTime) / 1000;
+                } else {
+                    currentTotalSeconds = elapsedSeconds;
+                }
+                timerDisplay.textContent = formatTime(Math.floor(currentTotalSeconds));
             }
 
             function updateTotalTime() {
@@ -368,4 +423,5 @@
     </script>
 </body>
 </html>
+
 
